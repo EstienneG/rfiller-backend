@@ -1,0 +1,8 @@
+uvicorn==0.27.1
+fastapi==0.110.0
+qdrant-client==1.8.0
+python-dotenv
+openai
+sqlalchemy
+alembic
+psycopg2-binary
