@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from common.constants import GROQ_API_KEY
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.dependencies import get_db
@@ -23,7 +24,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     Base.metadata.create_all(bind=engine)
 
     api_global_variables.llm = Groq(
-        api_key=os.environ.get("GROQ_API_KEY"),
+        api_key=GROQ_API_KEY,
     )
 
     # api_global_variables.qdrant_client = QdrantClient(
