@@ -6,3 +6,4 @@ openai
 sqlalchemy
 alembic
 psycopg2-binary
+groq

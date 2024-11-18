@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.dependencies import get_db
 from common.embedder import Embedder
@@ -9,6 +10,7 @@ from database.db import Base, engine
 from database.models import Document, User
 from fastapi import Depends, FastAPI, HTTPException, Request
 from sqlalchemy.orm import Session
+from groq import Groq
 
 
 @asynccontextmanager
@@ -19,6 +21,10 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """
 
     Base.metadata.create_all(bind=engine)
+
+    api_global_variables.llm = Groq(
+        api_key=os.environ.get("GROQ_API_KEY"),
+    )
 
     # api_global_variables.qdrant_client = QdrantClient(
     #     host=QDRANT_HOST, port=QDRANT_PORT
@@ -72,6 +78,10 @@ async def get_users(db: Session = Depends(get_db)):
 
 @app.post("/rfp_analysis")
 async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
+    rfp_title = document.title
+    rfp = document.content
+    rfp_summary = rfp_utils.summarize(rfp)
+
     db_document = Document(**document.model_dump())
 
     db.add(db_document)
