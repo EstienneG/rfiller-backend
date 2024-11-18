@@ -1,19 +1,26 @@
-import os
+from common.api_global_variables import api_global_variables
 
-from groq import Groq
 
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
+def summarize_rfp(rfp_title: str, rfp: bytes) -> str:
+    rfp_content: str = rfp.decode("utf-8")
 
-chat_completion = client.chat.completions.create(
-    messages=[
-        {
-            "role": "user",
-            "content": "Explain the importance of fast language models",
-        }
-    ],
-    model="llama3-8b-8192",
-)
+    rfp_summary = (
+        api_global_variables.llm.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "You are a summariser AI. Please summarize this RFP."
+                    + "Title: "
+                    + rfp_title
+                    + "Content: "
+                    + rfp_content,
+                }
+            ],
+            model="llama3-8b-8192",
+        )
+        .choices[0]
+        .message.content
+    )
 
-print(chat_completion.choices[0].message.content)
+    print(rfp_summary)
+    return rfp_summary

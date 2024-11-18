@@ -6,7 +6,7 @@ from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.dependencies import get_db
 from common.embedder import Embedder
-from common.schemas import DocumentDto
+from common.schemas import DocumentDto, UserDto
 from database.db import Base, engine
 from database.models import Document, User
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -77,11 +77,21 @@ async def get_users(db: Session = Depends(get_db)):
     return users
 
 
+@app.post("/user")
+async def create_user(userDto: UserDto, db: Session = Depends(get_db)):
+    db_user = User(**userDto.dict())
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
 @app.post("/rfp_analysis")
 async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
     rfp_title = document.title
     rfp = document.content
-    rfp_summary = rfp_utils.summarize(rfp)
+
+    rfp_summary = rfp_utils.summarize(rfp_title, rfp)
 
     db_document = Document(**document.model_dump())
 
@@ -89,4 +99,4 @@ async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_document)
 
-    return db_document
+    return rfp_summary
