@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+import uuid
 
 import fitz
 import pymupdf4llm
@@ -101,12 +102,11 @@ async def rfp_analysis(document: UploadFile, db: Session = Depends(get_db)):
 
         rfp_pdf = fitz.open(stream=rfp_content, filetype="pdf")
 
-        metadata = rfp_pdf.metadata
-        rfp_title = metadata.get("title", None)
-
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
 
-        rfp_summary = rfp_utils.summarize(rfp_title, rfp_md)
+        rfp_title = uuid.uuid4()
+
+        rfp_summary = rfp_utils.summarize("AO groupe", rfp_md)
 
         # rfp_utils.chunk(rfp_content)
 

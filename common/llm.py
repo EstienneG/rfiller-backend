@@ -7,10 +7,10 @@ def summarize(rfp_title: str, rfp_content: str) -> str:
             messages=[
                 {
                     "role": "user",
-                    "content": "You are a summariser AI. Please summarize this RFP."
-                    + "Title: "
+                    "content": "Tu es un agent qui résume des appels d'offre. Tu vas résumer et montrer les dates et les critères principaux d'évaluation de l'appel d'offre."
+                    + "Titre de l'appel d'offre: "
                     + rfp_title
-                    + "Content: "
+                    + "Contenu de l'appel d'offre: "
                     + rfp_content,
                 }
             ],
