@@ -31,7 +31,7 @@ def summarize(rfp_title: str, rfp_content: str) -> str:
 
 
 def call_groq(question: str) -> str:
-    return (
+    answer = (
         api_global_variables.llm.chat.completions.create(
             messages=[{"role": "user", "content": question}],
             model="llama3-8b-8192",
@@ -39,3 +39,6 @@ def call_groq(question: str) -> str:
         .choices[0]
         .message.content
     )
+    phospho.log(input=question, output=answer)
+
+    return answer
