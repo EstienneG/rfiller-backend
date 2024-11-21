@@ -1,23 +1,23 @@
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-import uuid
 
 import fitz
 import phospho
 import pymupdf4llm
-
-from common.llm import call_groq
-from common.constants import GROQ_API_KEY, PHOSPHO_API_KEY
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
+from common.constants import GROQ_API_KEY, PHOSPHO_API_KEY
 from common.dependencies import get_db
 from common.embedder import Embedder
+from common.llm import call_groq
 from common.schemas import UserDto
 from database.db import Base, engine
 from database.models import Document, User
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
-from sqlalchemy.orm import Session
+from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
+from sqlalchemy.orm import Session
 
 
 @asynccontextmanager
@@ -46,6 +46,16 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "https://rfiller-frontend.vercel.app/",
+    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
