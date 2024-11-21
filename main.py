@@ -1,15 +1,19 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import fitz
+import pymupdf4llm
+
+from common.llm import call_groq
 from common.constants import GROQ_API_KEY
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.dependencies import get_db
 from common.embedder import Embedder
-from common.schemas import DocumentDto, UserDto
+from common.schemas import UserDto
 from database.db import Base, engine
 from database.models import Document, User
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
 from groq import Groq
 
@@ -87,16 +91,38 @@ async def create_user(userDto: UserDto, db: Session = Depends(get_db)):
 
 
 @app.post("/rfp_analysis")
-async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
-    rfp_title = document.title
-    rfp = document.content
+async def rfp_analysis(document: UploadFile, db: Session = Depends(get_db)):
+    try:
+        # Read the uploaded file
+        rfp_content = await document.read()
 
-    rfp_summary = rfp_utils.summarize(rfp_title, rfp)
+        if not rfp_content.startswith(b"%PDF"):
+            raise ValueError("The uploaded file is not a valid PDF.")
 
-    db_document = Document(**document.model_dump())
+        rfp_pdf = fitz.open(stream=rfp_content, filetype="pdf")
 
-    db.add(db_document)
-    db.commit()
-    db.refresh(db_document)
+        metadata = rfp_pdf.metadata
+        rfp_title = metadata.get("title", None)
 
-    return rfp_summary
+        rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
+
+        rfp_summary = rfp_utils.summarize(rfp_title, rfp_md)
+
+        # rfp_utils.chunk(rfp_content)
+
+        db_document = Document(title=rfp_title, content=rfp_content, user_id=2)
+
+        db.add(db_document)
+        db.commit()
+        db.refresh(db_document)
+
+        return rfp_summary
+    except fitz.FileDataError as e:
+        raise ValueError("Failed to open the PDF. Ensure the file is valid.") from e
+    except Exception as e:
+        raise ValueError(f"An error occurred while processing the PDF: {e}") from e
+
+
+@app.post("/test-phospho")
+async def test_phospho(question: str):
+    return call_groq(question)

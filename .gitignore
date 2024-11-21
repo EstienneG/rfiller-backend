@@ -24,3 +24,4 @@ qdrant_data
 __pycache__/
 
 postgres_data
+test/

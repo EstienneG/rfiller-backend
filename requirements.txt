@@ -6,4 +6,10 @@ openai
 sqlalchemy
 alembic
 psycopg2-binary
+<<<<<<< Updated upstream
 groq
+=======
+groq
+pymupdf4llm
+python-multipart
+>>>>>>> Stashed changes
