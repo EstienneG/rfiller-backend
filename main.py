@@ -51,7 +51,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://rfiller-frontend.vercel.app/",
+        "https://rfiller-frontend.vercel.app",
     ],
     allow_methods=["*"],
     allow_headers=["*"],
