@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 import uuid
 
 import fitz
+import phospho
 import pymupdf4llm
 
 from common.llm import call_groq
-from common.constants import GROQ_API_KEY
+from common.constants import GROQ_API_KEY, PHOSPHO_API_KEY
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.dependencies import get_db
@@ -31,6 +32,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     api_global_variables.llm = Groq(
         api_key=GROQ_API_KEY,
     )
+
+    phospho.init(api_key=PHOSPHO_API_KEY, project_id="377e4f22774446849175109f663ad991")
 
     # api_global_variables.qdrant_client = QdrantClient(
     #     host=QDRANT_HOST, port=QDRANT_PORT

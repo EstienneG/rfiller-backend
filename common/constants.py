@@ -26,3 +26,6 @@ DATABASE_URL = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST
 
 # Groq config
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+# Phospho config
+PHOSPHO_API_KEY = os.getenv("PHOSPHO_API_KEY")
