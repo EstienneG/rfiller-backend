@@ -9,3 +9,4 @@ psycopg2-binary
 groq
 pymupdf4llm
 python-multipart
+phospho
