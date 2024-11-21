@@ -1,9 +1,7 @@
 from common.api_global_variables import api_global_variables
 
 
-def summarize_rfp(rfp_title: str, rfp: bytes) -> str:
-    rfp_content: str = rfp.decode("utf-8")
-
+def summarize(rfp_title: str, rfp_content: str) -> str:
     rfp_summary = (
         api_global_variables.llm.chat.completions.create(
             messages=[
@@ -24,3 +22,14 @@ def summarize_rfp(rfp_title: str, rfp: bytes) -> str:
 
     print(rfp_summary)
     return rfp_summary
+
+
+def call_groq(question: str) -> str:
+    return (
+        api_global_variables.llm.chat.completions.create(
+            messages=[{"role": "user", "content": question}],
+            model="llama3-8b-8192",
+        )
+        .choices[0]
+        .message.content
+    )

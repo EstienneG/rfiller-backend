@@ -1,6 +1,10 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import fitz
+import pymupdf4llm
+
+from common.llm import call_groq
 from common.constants import GROQ_API_KEY
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
@@ -89,9 +93,15 @@ async def create_user(userDto: UserDto, db: Session = Depends(get_db)):
 @app.post("/rfp_analysis")
 async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
     rfp_title = document.title
-    rfp = document.content
+    rfp_bytes = document.content
 
-    rfp_summary = rfp_utils.summarize(rfp_title, rfp)
+    rfp_pdf = fitz.open(stream=rfp_bytes, filetype="pdf")
+
+    rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
+
+    rfp_summary = rfp_utils.summarize(rfp_title, rfp_md)
+
+    # rfp_utils.chunk(rfp_content)
 
     db_document = Document(**document.model_dump())
 
@@ -100,3 +110,8 @@ async def rfp_analysis(document: DocumentDto, db: Session = Depends(get_db)):
     db.refresh(db_document)
 
     return rfp_summary
+
+
+@app.post("/test-phospho")
+async def test_phospho(question: str):
+    return call_groq(question)
