@@ -65,7 +65,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return 200
+    return {"status": "OK"}, 200
 
 
 @app.post("/embedding")
