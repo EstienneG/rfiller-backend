@@ -68,7 +68,7 @@ app.add_middleware(
 
 @app.get("/health")
 def read_root():
-    return {"message": "Welcome to the FastAPI + PostgreSQL + Qdrant app"}
+    return {"status": "ok"}
 
 
 @app.post("/embedding")
