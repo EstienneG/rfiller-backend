@@ -65,7 +65,7 @@ app.add_middleware(
 
 @app.get("/health")
 def read_root():
-    return {"status": "ok"}
+    return "OK", 200
 
 
 @app.post("/embedding")
