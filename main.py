@@ -5,19 +5,22 @@ from contextlib import asynccontextmanager
 import fitz
 import phospho
 import pymupdf4llm
+from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from groq import Groq
+from supabase import create_client
+
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
-from common.constants import GROQ_API_KEY, PHOSPHO_API_KEY
-from common.dependencies import get_db
+from common.constants import (
+    GROQ_API_KEY,
+    PHOSPHO_API_KEY,
+    SUPABASE_API_KEY,
+    SUPABASE_URL,
+)
 from common.embedder import Embedder
 from common.llm import call_groq
 from common.schemas import UserDto
-from database.db import Base, engine
-from database.models import Document, User
-from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
-from groq import Groq
-from sqlalchemy.orm import Session
 
 
 @asynccontextmanager
@@ -27,7 +30,12 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     FastAPI doc about lifespan events: https://fastapi.tiangolo.com/advanced/events/.
     """
 
-    Base.metadata.create_all(bind=engine)
+    if SUPABASE_URL and SUPABASE_API_KEY:
+        api_global_variables.supabase_client = create_client(
+            SUPABASE_URL, SUPABASE_API_KEY
+        )
+    else:
+        raise ValueError("Supabase URL or Key missing")
 
     api_global_variables.llm = Groq(
         api_key=GROQ_API_KEY,
@@ -89,23 +97,28 @@ async def search_vector(request: Request):
     raise HTTPException(status_code=400, detail="Query vector missing")
 
 
-@app.get("/user")
-async def get_users(db: Session = Depends(get_db)):
-    users = db.query(User).all()
-    return users
+@app.get("/users")
+async def get_users():
+    response = api_global_variables.supabase_client.table("users").select("*").execute()
+    return response.data
 
 
-@app.post("/user")
-async def create_user(userDto: UserDto, db: Session = Depends(get_db)):
-    db_user = User(**userDto.dict())
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return db_user
+@app.post("/users")
+async def create_user(userDto: UserDto):
+    response = (
+        api_global_variables.supabase_client.table("users")
+        .insert({"id": userDto.id, "name": userDto.name})
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(status_code=400, detail="Failed to create user")
+
+    return response.data[0]
 
 
 @app.post("/rfp_analysis")
-async def rfp_analysis(document: UploadFile, db: Session = Depends(get_db)):
+async def rfp_analysis(document: UploadFile):
     try:
         # Read the uploaded file
         rfp_content = await document.read()
@@ -117,20 +130,27 @@ async def rfp_analysis(document: UploadFile, db: Session = Depends(get_db)):
 
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
 
-        rfp_title = uuid.uuid4()
+        rfp_title = str(uuid.uuid4())
 
         rfp_summary = rfp_utils.summarize("AO groupe", rfp_md)
 
-        # rfp_utils.chunk(rfp_content)
+        response = (
+            api_global_variables.supabase_client.table("documents")
+            .insert(
+                {
+                    "title": rfp_title,
+                    "content": rfp_summary,  # Convert bytes to string
+                    "user_id": 1,
+                }
+            )
+            .execute()
+        )
 
-        db_document = Document(title=rfp_title, content=rfp_content, user_id=2)
-
-        db.add(db_document)
-        db.commit()
-        db.refresh(db_document)
+        if not response.data:
+            raise HTTPException(status_code=400, detail="Failed to store document")
 
         return rfp_summary
-    except fitz.FileDataError as e:
+    except RuntimeError as e:
         raise ValueError("Failed to open the PDF. Ensure the file is valid.") from e
     except Exception as e:
         raise ValueError(f"An error occurred while processing the PDF: {e}") from e

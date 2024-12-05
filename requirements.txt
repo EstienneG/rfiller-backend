@@ -10,3 +10,4 @@ groq
 pymupdf4llm
 python-multipart
 phospho
+PyMuPDF
