@@ -64,7 +64,7 @@ app.add_middleware(
 
 
 @app.get("/health")
-def read_root():
+def health():
     return "OK", 200
 
 
