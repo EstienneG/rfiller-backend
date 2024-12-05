@@ -55,19 +55,6 @@ Run the FastAPI server locally with:
   uvicorn main:app --reload
 ```
 
-## 4. Use the DB model
-
-Upgrade the local DB from the migration files
-```bash
-  alembic upgrade head
-```
-
-Upgrade the migration files and the local DB from the migration files
-```bash
-  alembic revision --autogenerate -m "YOUR_COMMIT_MESSAGE"
-  alembic upgrade head
-```
-
 ## 5. Push the last docker image
 
 ```bash
