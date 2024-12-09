@@ -1,13 +1,12 @@
-import uuid
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-import fitz
 import phospho
 import pymupdf4llm
 from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
+from qdrant_client import QdrantClient
 from supabase import create_client
 
 from common import rfp_utils
@@ -17,6 +16,8 @@ from common.constants import (
     PHOSPHO_API_KEY,
     SUPABASE_API_KEY,
     SUPABASE_URL,
+    QDRANT_HOST,
+    QDRANT_PORT,
 )
 from common.embedder import Embedder
 from common.llm import call_groq
@@ -42,14 +43,13 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         api_key=GROQ_API_KEY,
     )
 
-    phospho.init(api_key=PHOSPHO_API_KEY, project_id="377e4f22774446849175109f663ad991")
+    api_global_variables.qdrant_client = QdrantClient(
+        host=QDRANT_HOST, port=QDRANT_PORT
+    )
 
-    # api_global_variables.qdrant_client = QdrantClient(
-    #     host=QDRANT_HOST, port=QDRANT_PORT
-    # )
     api_global_variables.embedder = Embedder()
 
-    api_global_variables.test_agent = Agent(
+    api_global_variables.rfp_analysis_agent = Agent(
         "groq:llama3-8b-8192",
         result_type=RfpAnalysis,
         system_prompt=(
@@ -57,9 +57,11 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         ),
     )
 
+    phospho.init(api_key=PHOSPHO_API_KEY, project_id="377e4f22774446849175109f663ad991")
+
     yield
 
-    # api_global_variables.qdrant_client.close()
+    api_global_variables.qdrant_client.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -98,39 +100,30 @@ async def create_user(userDto: UserDto):
 
 
 @app.post("/rfp_analysis")
-async def rfp_analysis(document: UploadFile):
+async def rfp_analysis(rfp_file: UploadFile):
     try:
-        # Read the uploaded file
-        rfp_content = await document.read()
-
-        if not rfp_content.startswith(b"%PDF"):
-            raise ValueError("The uploaded file is not a valid PDF.")
-
-        rfp_pdf = fitz.open(stream=rfp_content, filetype="pdf")
+        (rfp_pdf, rfp_title) = await rfp_utils.read_file(rfp_file)
 
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
-        rfp_chunks = rfp_utils.chunk(rfp_md)
+        rfp_chunks = rfp_utils.chunk_and_store_embeddings(rfp_md, rfp_title)
 
-        rfp_title = str(uuid.uuid4())
+        rfp_analysis = await api_global_variables.rfp_analysis_agent.run(rfp_md)
 
-        rfp_summary = await api_global_variables.test_agent.run(rfp_md)
+        print(rfp_analysis.data)
 
-        print(rfp_summary.data)
-        rfp_summary = rfp_utils.summarize("AO groupe", rfp_md)
-
-        response = (
+        rfp_file = (
             api_global_variables.supabase_client.table("documents")
             .insert(
                 {
                     "title": rfp_title,
-                    "content": rfp_summary,  # Convert bytes to string
+                    "content": str(rfp_analysis.data),
                     "user_id": 1,
                 }
             )
             .execute()
         )
 
-        if not response.data:
+        if not rfp_file.data:
             raise HTTPException(status_code=400, detail="Failed to store document")
 
         return rfp_chunks
@@ -156,8 +149,8 @@ async def get_companies():
 @app.post("/companies")
 async def create_company(
     company_dto: CompanyDto,
-):  # input must be a ConversationDto object
-    """Handles new users requests"""
+):
+    """Handles new company requests"""
     response = (
         api_global_variables.supabase_client.table("companies")
         .insert(

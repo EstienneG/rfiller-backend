@@ -34,10 +34,10 @@ class DocumentDto(BaseModel):
 
 
 class RfpAnalysis(BaseModel):
-    risk: int = Field(description="Risk level of query", ge=0, le=10)
+    risk: int = Field(description="Risk level of answering the RFP", ge=0, le=10)
     requirements: list[str] = Field(
         description="List of requirements that have to be respected"
     )
     dates: list[str] = Field(
-        description="dates and their associated document to produce"
+        description="List of dates associated with each requirement"
     )
