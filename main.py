@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import fitz
 import phospho
 import pymupdf4llm
-from fastapi import FastAPI, HTTPException, Request, UploadFile
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
 from supabase import create_client
@@ -20,7 +20,8 @@ from common.constants import (
 )
 from common.embedder import Embedder
 from common.llm import call_groq
-from common.schemas import UserDto
+from common.schemas import CompanyDto, RfpAnalysis, UserDto
+from pydantic_ai import Agent
 
 
 @asynccontextmanager
@@ -48,6 +49,14 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     # )
     api_global_variables.embedder = Embedder()
 
+    api_global_variables.test_agent = Agent(
+        "groq:llama3-8b-8192",
+        result_type=RfpAnalysis,
+        system_prompt=(
+            "Tu es un agent qui analyse un appel d'offre et donne les requirements et dates ainsi qu'un risque à répondre entre 1 et 10"
+        ),
+    )
+
     yield
 
     # api_global_variables.qdrant_client.close()
@@ -66,32 +75,6 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "OK"}, 200
-
-
-@app.post("/embedding")
-async def embbed_file(request: Request):
-    data = await request.json()
-    vector = data.get("vector")
-    payload = data.get("payload")
-    if vector:
-        api_global_variables.qdrant_client.upsert(
-            collection_name="your_collection",
-            points=[{"id": "unique-id", "vector": vector, "payload": payload}],
-        )
-        return {"message": "Vector added successfully"}
-    raise HTTPException(status_code=400, detail="Vector data missing")
-
-
-@app.post("/search")
-async def search_vector(request: Request):
-    data = await request.json()
-    query_vector = data.get("vector")
-    if query_vector:
-        result = api_global_variables.qdrant_client.search(
-            collection_name="your_collection", query_vector=query_vector, limit=5
-        )
-        return result
-    raise HTTPException(status_code=400, detail="Query vector missing")
 
 
 @app.get("/users")
@@ -126,9 +109,13 @@ async def rfp_analysis(document: UploadFile):
         rfp_pdf = fitz.open(stream=rfp_content, filetype="pdf")
 
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
+        rfp_chunks = rfp_utils.chunk(rfp_md)
 
         rfp_title = str(uuid.uuid4())
 
+        rfp_summary = await api_global_variables.test_agent.run(rfp_md)
+
+        print(rfp_summary.data)
         rfp_summary = rfp_utils.summarize("AO groupe", rfp_md)
 
         response = (
@@ -146,7 +133,7 @@ async def rfp_analysis(document: UploadFile):
         if not response.data:
             raise HTTPException(status_code=400, detail="Failed to store document")
 
-        return rfp_summary
+        return rfp_chunks
     except RuntimeError as e:
         raise ValueError("Failed to open the PDF. Ensure the file is valid.") from e
     except Exception as e:
@@ -156,3 +143,37 @@ async def rfp_analysis(document: UploadFile):
 @app.post("/test-phospho")
 async def test_phospho(question: str):
     return call_groq(question)
+
+
+@app.get("/companies")
+async def get_companies():
+    response = (
+        api_global_variables.supabase_client.table("companies").select("*").execute()
+    )
+    return response.data
+
+
+@app.post("/companies")
+async def create_company(
+    company_dto: CompanyDto,
+):  # input must be a ConversationDto object
+    """Handles new users requests"""
+    response = (
+        api_global_variables.supabase_client.table("companies")
+        .insert(
+            {
+                "name": company_dto.name,
+                "email": company_dto.email,
+                "industry": company_dto.industry,
+                "size": company_dto.size,
+                "location": company_dto.location,
+                "founded": company_dto.founded,
+            }
+        )
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(status_code=400, detail="Failed to create company")
+
+    return response.data[0]
