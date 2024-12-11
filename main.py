@@ -99,7 +99,7 @@ async def create_user(userDto: UserDto):
 
 
 @app.post("/initialize-analysis")
-async def create_embeddings(rfp_file: UploadFile):
+async def create_embeddings(rfp_file: UploadFile, company_id: int):
     try:
         (rfp_pdf, rfp_title) = await rfp_utils.read_file(rfp_file)
 
@@ -115,7 +115,7 @@ async def create_embeddings(rfp_file: UploadFile):
                 {
                     "title": rfp_title,
                     "summary": rfp_summary,
-                    "user_id": 1,
+                    "company_id": company_id,
                 }
             )
             .execute()
