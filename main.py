@@ -9,6 +9,7 @@ from groq import Groq
 from qdrant_client import QdrantClient
 from supabase import create_client
 
+from common.ai_agents import RequirementsExtractor
 from common import rfp_utils
 from common.api_global_variables import api_global_variables
 from common.constants import (
@@ -20,9 +21,13 @@ from common.constants import (
     QDRANT_PORT,
 )
 from common.embedder import Embedder
-from common.llm import call_groq, summarize_chunks, summarize_chunks_summaries
-from common.schemas import CompanyDto, RfpAnalysis, UserDto
-from pydantic_ai import Agent
+from common.llm import (
+    call_groq,
+    extract_requirements,
+    summarize_chunks,
+    summarize_chunks_summaries,
+)
+from common.schemas import CompanyDto, UserDto
 
 
 @asynccontextmanager
@@ -49,13 +54,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
 
     api_global_variables.embedder = Embedder()
 
-    api_global_variables.rfp_analysis_agent = Agent(
-        "groq:llama3-8b-8192",
-        result_type=RfpAnalysis,
-        system_prompt=(
-            "Tu es un agent qui analyse un appel d'offre et donne les requirements et dates ainsi qu'un risque à répondre entre 1 et 10"
-        ),
-    )
+    api_global_variables.requirement_extractor = RequirementsExtractor()
 
     phospho.init(api_key=PHOSPHO_API_KEY, project_id="377e4f22774446849175109f663ad991")
 
@@ -99,32 +98,30 @@ async def create_user(userDto: UserDto):
     return response.data[0]
 
 
-@app.post("/rfp_analysis")
-async def rfp_analysis(rfp_file: UploadFile):
+@app.post("/initialize-analysis")
+async def create_embeddings(rfp_file: UploadFile):
     try:
         (rfp_pdf, rfp_title) = await rfp_utils.read_file(rfp_file)
 
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
-        rfp_chunks = rfp_utils.chunk_and_store_embeddings(rfp_md, rfp_title)
+        rfp_chunks = rfp_utils.chunk(rfp_md)
+
         rfp_chunks_summaries = summarize_chunks(rfp_chunks)
-
         rfp_summary = summarize_chunks_summaries(rfp_chunks_summaries)
-
-        # rfp_analysis = await api_global_variables.rfp_analysis_agent.run(rfp_md)
-        print(rfp_summary)
 
         rfp = (
             api_global_variables.supabase_client.table("documents")
             .upsert(
                 {
                     "title": rfp_title,
-                    "content": str(rfp_chunks),
                     "summary": rfp_summary,
                     "user_id": 1,
                 }
             )
             .execute()
         )
+
+        rfp_utils.create_embeddings(rfp.data[0]["id"], rfp_chunks)
 
         if not rfp.data:
             raise HTTPException(status_code=400, detail="Failed to store document")
@@ -134,6 +131,30 @@ async def rfp_analysis(rfp_file: UploadFile):
         raise ValueError("Failed to open the PDF. Ensure the file is valid.") from e
     except Exception as e:
         raise ValueError(f"An error occurred while processing the PDF: {e}") from e
+
+
+@app.post("/requirements")
+async def create_requirements(rfp_id: int):
+    points, _ = api_global_variables.qdrant_client.scroll(
+        collection_name=str(rfp_id),
+        offset=0,
+        limit=1000,
+    )
+
+    rfp_chunks = [point.payload["chunk"] for point in points]
+
+    extracted_requirements = await extract_requirements(rfp_chunks)
+
+    for extracted_requirement in extracted_requirements:
+        api_global_variables.supabase_client.table("requirements").insert(
+            {
+                "rfp_id": rfp_id,
+                "description": extracted_requirement.requirement,
+                "due_date": extracted_requirement.due_date,
+            }
+        ).execute()
+
+    return extracted_requirements
 
 
 @app.post("/test-phospho")

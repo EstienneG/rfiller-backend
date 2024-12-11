@@ -1,4 +1,5 @@
 from groq import Groq
+from common.ai_agents import RequirementsExtractor
 from common.embedder import Embedder
 from qdrant_client import QdrantClient
 
@@ -9,6 +10,7 @@ class ApiGlobalVariables:
     qdrant_client: QdrantClient
     embedder: Embedder
     llm: Groq
+    requirement_extractor: RequirementsExtractor
 
 
 api_global_variables = ApiGlobalVariables()

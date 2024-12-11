@@ -3,11 +3,11 @@ from typing import List, Tuple
 
 from fastapi import UploadFile
 import fitz
-from qdrant_client.http import models
+from common.api_global_variables import api_global_variables
 from common.constants import QDRANT_EMBEDDING_SIZE
 from common import llm
-from common.api_global_variables import api_global_variables
-from qdrant_client.http.models import PointStruct
+from qdrant_client import models
+from qdrant_client.models import PointStruct
 
 
 def summarize(rfp_title: str, rfp: bytes) -> str:
@@ -30,7 +30,7 @@ async def read_file(rfp_file: UploadFile) -> Tuple[fitz.Document, str]:
     return rfp_pdf, rfp_title
 
 
-def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
+def chunk(md_content: str) -> List[str]:
     chunks = []
     current_chunk = []
     lines = md_content.split("\n")
@@ -53,8 +53,12 @@ def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
         chunk_content = "\n".join(current_chunk).strip()
         chunks.append(chunk_content)
 
+    return chunks
+
+
+def create_embeddings(rfp_id: int, chunks: List[str]) -> None:
     api_global_variables.qdrant_client.recreate_collection(
-        collection_name=rfp_title,
+        collection_name=str(rfp_id),
         vectors_config=models.VectorParams(
             size=QDRANT_EMBEDDING_SIZE, distance=models.Distance.COSINE
         ),
@@ -63,7 +67,7 @@ def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
     embeddings = api_global_variables.embedder.embed(chunks)
 
     api_global_variables.qdrant_client.upsert(
-        collection_name=rfp_title,
+        collection_name=str(rfp_id),
         points=[
             PointStruct(
                 id=idx,
@@ -77,5 +81,3 @@ def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
             for idx, embedding in enumerate(embeddings)
         ],
     )
-
-    return chunks

@@ -33,11 +33,12 @@ class DocumentDto(BaseModel):
         from_attributes = True
 
 
-class RfpAnalysis(BaseModel):
-    risk: int = Field(description="Risk level of answering the RFP", ge=0, le=10)
-    requirements: list[str] = Field(
-        description="List of requirements that have to be respected"
-    )
-    dates: list[str] = Field(
-        description="List of dates associated with each requirement"
+class RfpRequirement(BaseModel):
+    requirement: str = Field(description="Description du rendu.")
+    due_date: Optional[str] = Field(description="Date limite de rendu.")
+
+
+class RfpRequirements(BaseModel):
+    requirements_and_dates: list[RfpRequirement] = Field(
+        description="Liste de paires de rendus et de dates associées."
     )
