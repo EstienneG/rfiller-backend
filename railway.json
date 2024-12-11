@@ -7,7 +7,10 @@
         "dockerfilePath": null,
         "baseImage": "qdrant/qdrant:v1.8.3"
       },
-      "port": 6333
+      "port": 6333,
+      "volumes": {
+        "/qdrant/storage": "/mnt/qdrant_data"
+      }
     },
     {
       "name": "backend",
