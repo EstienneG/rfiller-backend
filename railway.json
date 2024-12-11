@@ -1,15 +1,20 @@
 {
-    "$schema": "https://railway.app/railway.schema.json",
-    "build": {
-      "builder": "DOCKERFILE",
-      "dockerfilePath": "Dockerfile"
+  "services": [
+    {
+      "name": "qdrant",
+      "startCommand": null,
+      "build": {
+        "dockerfilePath": null,
+        "baseImage": "qdrant/qdrant:v1.8.3"
+      },
+      "port": 6333
     },
-    "deploy": {
-      "runtime": "V2",
-      "numReplicas": 1,
-      "healthcheckPath": "/health",
-      "sleepApplication": true,
-      "restartPolicyType": "ON_FAILURE",
-      "restartPolicyMaxRetries": 2
+    {
+      "name": "backend",
+      "build": {
+        "dockerfilePath": "Dockerfile"
+      },
+      "port": 8000
     }
-  }
+  ]
+}
