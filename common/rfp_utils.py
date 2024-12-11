@@ -81,3 +81,26 @@ def create_embeddings(rfp_id: int, chunks: List[str]) -> None:
             for idx, embedding in enumerate(embeddings)
         ],
     )
+
+
+async def create_requirements(rfp_id: str) -> list[str]:
+    points, _ = api_global_variables.qdrant_client.scroll(
+        collection_name=str(rfp_id),
+        offset=0,
+        limit=1000,
+    )
+
+    rfp_chunks = [point.payload["chunk"] for point in points]
+
+    extracted_requirements = await llm.extract_requirements(rfp_chunks)
+
+    for extracted_requirement in extracted_requirements:
+        api_global_variables.supabase_client.table("requirements").insert(
+            {
+                "rfp_id": rfp_id,
+                "description": extracted_requirement.requirement,
+                "due_date": extracted_requirement.due_date,
+            }
+        ).execute()
+
+    return extracted_requirements

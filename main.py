@@ -23,7 +23,6 @@ from common.constants import (
 from common.embedder import Embedder
 from common.llm import (
     call_groq,
-    extract_requirements,
     summarize_chunks,
     summarize_chunks_summaries,
 )
@@ -135,26 +134,16 @@ async def create_embeddings(rfp_file: UploadFile, company_id: int):
 
 @app.post("/requirements")
 async def create_requirements(rfp_id: int):
-    points, _ = api_global_variables.qdrant_client.scroll(
-        collection_name=str(rfp_id),
-        offset=0,
-        limit=1000,
+    existing_requirements = (
+        api_global_variables.supabase_client.table("requirements")
+        .select("*")
+        .eq("rfp_id", rfp_id)
+        .execute()
     )
+    if existing_requirements.data:
+        return existing_requirements.data
 
-    rfp_chunks = [point.payload["chunk"] for point in points]
-
-    extracted_requirements = await extract_requirements(rfp_chunks)
-
-    for extracted_requirement in extracted_requirements:
-        api_global_variables.supabase_client.table("requirements").insert(
-            {
-                "rfp_id": rfp_id,
-                "description": extracted_requirement.requirement,
-                "due_date": extracted_requirement.due_date,
-            }
-        ).execute()
-
-    return extracted_requirements
+    return rfp_utils.create_requirements(rfp_id)
 
 
 @app.post("/test-phospho")
