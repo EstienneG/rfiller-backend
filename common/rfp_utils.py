@@ -11,7 +11,7 @@ from qdrant_client.http.models import PointStruct
 
 
 def summarize(rfp_title: str, rfp: bytes) -> str:
-    return llm.summarize(rfp_title, rfp)
+    return llm.summarize_chunks(rfp_title, rfp)
 
 
 async def read_file(rfp_file: UploadFile) -> Tuple[fitz.Document, str]:
@@ -54,7 +54,7 @@ def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
         chunks.append(chunk_content)
 
     api_global_variables.qdrant_client.recreate_collection(
-        collection_name="rfp_title",
+        collection_name=rfp_title,
         vectors_config=models.VectorParams(
             size=QDRANT_EMBEDDING_SIZE, distance=models.Distance.COSINE
         ),
@@ -63,12 +63,16 @@ def chunk_and_store_embeddings(md_content: str, rfp_title: str) -> List[str]:
     embeddings = api_global_variables.embedder.embed(chunks)
 
     api_global_variables.qdrant_client.upsert(
-        collection_name="rfp_title",
+        collection_name=rfp_title,
         points=[
             PointStruct(
                 id=idx,
                 vector=embedding,
-                payload={"chunk": chunks[idx]},
+                payload={
+                    "previous_chunk": chunks[idx - 1] if idx > 0 else None,
+                    "chunk": chunks[idx],
+                    "next_chunk": chunks[idx + 1] if idx < len(chunks) - 1 else None,
+                },
             )
             for idx, embedding in enumerate(embeddings)
         ],

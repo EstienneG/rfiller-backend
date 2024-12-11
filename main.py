@@ -20,7 +20,7 @@ from common.constants import (
     QDRANT_PORT,
 )
 from common.embedder import Embedder
-from common.llm import call_groq
+from common.llm import call_groq, summarize_chunks, summarize_chunks_summaries
 from common.schemas import CompanyDto, RfpAnalysis, UserDto
 from pydantic_ai import Agent
 
@@ -106,27 +106,30 @@ async def rfp_analysis(rfp_file: UploadFile):
 
         rfp_md = pymupdf4llm.to_markdown(rfp_pdf)
         rfp_chunks = rfp_utils.chunk_and_store_embeddings(rfp_md, rfp_title)
+        rfp_chunks_summaries = summarize_chunks(rfp_chunks)
 
-        rfp_analysis = await api_global_variables.rfp_analysis_agent.run(rfp_md)
+        rfp_summary = summarize_chunks_summaries(rfp_chunks_summaries)
 
-        print(rfp_analysis.data)
+        # rfp_analysis = await api_global_variables.rfp_analysis_agent.run(rfp_md)
+        print(rfp_summary)
 
-        rfp_file = (
+        rfp = (
             api_global_variables.supabase_client.table("documents")
-            .insert(
+            .upsert(
                 {
                     "title": rfp_title,
-                    "content": str(rfp_analysis.data),
+                    "content": str(rfp_chunks),
+                    "summary": rfp_summary,
                     "user_id": 1,
                 }
             )
             .execute()
         )
 
-        if not rfp_file.data:
+        if not rfp.data:
             raise HTTPException(status_code=400, detail="Failed to store document")
 
-        return rfp_chunks
+        return rfp
     except RuntimeError as e:
         raise ValueError("Failed to open the PDF. Ensure the file is valid.") from e
     except Exception as e:
