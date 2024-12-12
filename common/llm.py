@@ -31,7 +31,7 @@ def summarize_chunks(rfp_chunks: list[str]) -> list[str]:
                         "content": summarize_chunks_system_prompt,
                     }
                 ],
-                model="mixtral-8x7b-32768",
+                model="llama-3.2-90b-vision-preview",
             )
             .choices[0]
             .message.content
@@ -82,7 +82,7 @@ async def extract_requirements(rfp_chunks: list[str]) -> list[str]:
                         "content": extract_requirements_system_prompt,
                     }
                 ],
-                model="mixtral-8x7b-32768",
+                model="llama-3.2-90b-vision-preview",
             )
             .choices[0]
             .message.content
@@ -180,7 +180,7 @@ def call_groq(question: str) -> str:
     answer = (
         api_global_variables.llm.chat.completions.create(
             messages=[{"role": "user", "content": question}],
-            model="mixtral-8x7b-32768",
+            model="llama-3.2-90b-vision-preview",
         )
         .choices[0]
         .message.content
