@@ -40,5 +40,20 @@ class RfpRequirement(BaseModel):
 
 class RfpRequirements(BaseModel):
     requirements_and_dates: list[RfpRequirement] = Field(
-        description="Liste de paires de rendus et de dates associées."
+        description="Liste de paires de rendus et de leurs dates associées."
     )
+
+
+class RfpEvaluationCriterion(BaseModel):
+    criterion: str = Field(description="Critère d'évaluation.")
+    weight: str = Field(description="Poids du critère dans l'évaluation.")
+
+
+class RfpEvaluationCriteria(BaseModel):
+    evaluation_criteria: list[RfpEvaluationCriterion] = Field(
+        description="Liste de critères d'évaluation et leur poids dans l'évaluation."
+    )
+
+
+class Subtasks(BaseModel):
+    subtasks: list[str] = Field(description="List of subtasks.")

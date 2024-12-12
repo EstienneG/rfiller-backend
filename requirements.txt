@@ -11,3 +11,4 @@ phospho
 PyMuPDF
 supabase
 pydantic_ai
+bs4

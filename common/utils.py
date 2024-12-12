@@ -93,14 +93,52 @@ async def create_requirements(rfp_id: str) -> list[str]:
     rfp_chunks = [point.payload["chunk"] for point in points]
 
     extracted_requirements = await llm.extract_requirements(rfp_chunks)
+    requirements_dto = []
 
     for extracted_requirement in extracted_requirements:
-        api_global_variables.supabase_client.table("requirements").insert(
+        extracted_requirement = (
+            api_global_variables.supabase_client.table("requirements")
+            .insert(
+                {
+                    "rfp_id": rfp_id,
+                    "description": extracted_requirement.requirement,
+                    "due_date": extracted_requirement.due_date,
+                }
+            )
+            .execute()
+        )
+        requirements_dto.append(extracted_requirement.data[0])
+
+    return requirements_dto
+
+
+async def create_evaluation_criteria(rfp_id: str) -> list[str]:
+    points, _ = api_global_variables.qdrant_client.scroll(
+        collection_name=str(rfp_id),
+        offset=0,
+        limit=1000,
+    )
+
+    rfp_chunks = [point.payload["chunk"] for point in points]
+
+    extracted_criteria = await llm.extract_evaluation_criterias(rfp_chunks)
+
+    for criterion in extracted_criteria:
+        api_global_variables.supabase_client.table("evaluation_criteria").insert(
             {
                 "rfp_id": rfp_id,
-                "description": extracted_requirement.requirement,
-                "due_date": extracted_requirement.due_date,
+                "criterion": criterion.criterion,
+                "weight": criterion.weight,
             }
         ).execute()
 
-    return extracted_requirements
+    return extracted_criteria
+
+
+async def generate_answer(
+    rfp_summary: str, requirement_description: str, company_attributes: str
+):
+    requirement_generation = await llm.generate_requirement_answer(
+        rfp_summary, requirement_description, company_attributes
+    )
+    return requirement_generation
